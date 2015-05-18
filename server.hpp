@@ -1,6 +1,5 @@
 class SocketThread {
 public:
-
   SocketThread();
   ~SocketThread();
   bool start();
