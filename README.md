@@ -1,4 +1,4 @@
-# Unix Domain Socket example
+# Unix Domain Socket C++ Example
 This simple example covers a basic usage of Unix domain socket as well as pthread/signal written in C++.
 
 # Why this?
