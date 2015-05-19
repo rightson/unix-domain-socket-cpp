@@ -23,16 +23,6 @@ SocketThread::SocketThread()
     curr_sock_fd_(0) {
   fprintf(stdout, "Init mutex...\n");
   pthread_mutex_init(&mutex_, NULL);
-  struct sigaction act;
-  memset(&act, '\0', sizeof(act));
-  act.sa_sigaction = &thread_stopper;
-  act.sa_flags = SA_SIGINFO;
-  if (sigaction(SIGTERM, &act, NULL) == -1) {
-    fprintf(stderr, "Failed to register SIGTERM\n");
-  }
-  if (sigaction(SIGINT, &act, NULL) == -1) {
-    fprintf(stderr, "Failed to register SIGTINT\n");
-  }
 }
 
 SocketThread::~SocketThread() {
@@ -46,6 +36,7 @@ bool SocketThread::start() {
     return false;
   }
   fprintf(stdout, "Thread created\n");
+  handle_signals();
   return true;
 }
 
@@ -60,6 +51,7 @@ void SocketThread::stop() {
     close(sockfd_);
     sockfd_ = 0;
   }
+  cleanup_socket();
 }
 
 void SocketThread::set_socket_path(const std::string& path) {
@@ -84,10 +76,7 @@ void *SocketThread::run_server() {
     return NULL;
   }
 
-  if (access(socket_path_.c_str(), F_OK) != -1) {
-    fprintf(stdout, "Cleanup socket\n");
-    unlink(socket_path_.c_str());
-  }
+  cleanup_socket();
 
   fprintf(stdout, "Creating socket...\n");
   if ((sockfd_ = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
@@ -128,5 +117,25 @@ void *SocketThread::run_server() {
     }
     fprintf(stdout, "=> read buffer [%s]\n", buffer);
     close(curr_sock_fd_);
+  }
+}
+
+void SocketThread::handle_signals() {
+  struct sigaction act;
+  memset(&act, '\0', sizeof(act));
+  act.sa_sigaction = &thread_stopper;
+  act.sa_flags = SA_SIGINFO;
+  if (sigaction(SIGTERM, &act, NULL) == -1) {
+    fprintf(stderr, "Failed to register SIGTERM\n");
+  }
+  if (sigaction(SIGINT, &act, NULL) == -1) {
+    fprintf(stderr, "Failed to register SIGTINT\n");
+  }
+}
+
+void SocketThread::cleanup_socket() {
+  if (access(socket_path_.c_str(), F_OK) != -1) {
+    fprintf(stdout, "Cleanup socket\n");
+    unlink(socket_path_.c_str());
   }
 }

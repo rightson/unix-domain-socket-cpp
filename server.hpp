@@ -21,7 +21,9 @@ private:
 
   static void* thread_starter(void* obj);
   static void thread_stopper(int sig, siginfo_t* siginfo, void* context);
-  void * run_server();
+  void* run_server();
+  void handle_signals();
+  void cleanup_socket();
 
   pthread_t pid_;
   pthread_mutex_t mutex_;
