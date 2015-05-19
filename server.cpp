@@ -3,9 +3,8 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
-#include <pthread.h>
 #include <string.h>
-#include <signal.h>
+
 #include "server.hpp"
 
 SocketThread* SocketThread::instance_ = NULL;
@@ -28,10 +27,10 @@ SocketThread::SocketThread()
   memset(&act, '\0', sizeof(act));
   act.sa_sigaction = &thread_stopper;
   act.sa_flags = SA_SIGINFO;
-  if (sigaction(SIGTERM, &act, NULL) < 0) {
+  if (sigaction(SIGTERM, &act, NULL) == -1) {
     fprintf(stderr, "Failed to register SIGTERM\n");
   }
-  if (sigaction(SIGINT, &act, NULL) < 0) {
+  if (sigaction(SIGINT, &act, NULL) == -1) {
     fprintf(stderr, "Failed to register SIGTINT\n");
   }
 }
@@ -61,11 +60,10 @@ void SocketThread::stop() {
     close(sockfd_);
     sockfd_ = 0;
   }
+}
 
-  if (access(socket_path_.c_str(), F_OK) != -1) {
-    fprintf(stdout, "Cleanup socket\n");
-    unlink(socket_path_.c_str());
-  }
+void SocketThread::set_socket_path(const std::string& path) {
+  socket_path_ = path;
 }
 
 void *SocketThread::thread_starter(void *obj) {
@@ -84,6 +82,11 @@ void *SocketThread::run_server() {
   if (pthread_mutex_trylock(&mutex_) != 0) {
     fprintf(stderr, "Error: Failed to lock mutex thread\n");
     return NULL;
+  }
+
+  if (access(socket_path_.c_str(), F_OK) != -1) {
+    fprintf(stdout, "Cleanup socket\n");
+    unlink(socket_path_.c_str());
   }
 
   fprintf(stdout, "Creating socket...\n");
@@ -126,14 +129,4 @@ void *SocketThread::run_server() {
     fprintf(stdout, "=> read buffer [%s]\n", buffer);
     close(curr_sock_fd_);
   }
-}
-
-int main() {
-  SocketThread::Instance()->start();
-  char buffer[SocketThread::BUFFER_SIZE];
-  fprintf(stdout, "Fake loop...");
-  while (true) {
-    scanf("%s", buffer);
-  }
-  SocketThread::Instance()->stop();
 }

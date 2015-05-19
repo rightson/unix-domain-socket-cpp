@@ -1,8 +1,12 @@
+CXXFLAGS := -pthread -Wall
+TARGETS := server.o main.o
 
-server: server.cpp server.hpp
-	g++ $< -o $@ -pthread
+server: $(TARGETS)
+	$(CXX) -o $@ $^
+
+$(TARGETS): server.hpp
 
 clean:
-	rm -f server
+	rm -f server *.o
 
 .PHONY: clean
