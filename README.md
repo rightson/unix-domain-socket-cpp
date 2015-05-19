@@ -1,3 +1,6 @@
-# Unix Domain Socket Example in C++ Style
-This example shows how to use Unix domain socket running in a simple pthread (singleton) in C++ style. Sigaction is applied for capturing Ctrl-C event.
+# Unix Domain Socket example
+This simple example covers a basic usage of Unix domain socket as well as pthread/signal written in C++.
+
+# Why this?
+Integrating pthread and signal into C++ class/member functions are not so intuitive. Hope this example can help c++ novices pick up minimal knowledge they need to know before writing unix domain socket applications.
  
