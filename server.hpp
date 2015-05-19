@@ -1,7 +1,8 @@
+#include <string>
+
 class SocketThread {
 public:
-  SocketThread();
-  ~SocketThread();
+  static SocketThread* Instance();
   bool start();
   void stop();
   enum {
@@ -10,10 +11,16 @@ public:
   };
 
 private:
-  static void* thread_helper(void *obj);
-  void * thread_server();
+  SocketThread();
+  ~SocketThread();
+
+  static void* thread_starter(void *obj);
+  static void thread_stopper(int sig, siginfo_t *siginfo, void *context);
+  void * run_server();
   pthread_t pid_;
   pthread_mutex_t mutex_;
+  std::string socket_path_;
   int sockfd_;
   int curr_sock_fd_;
+  static SocketThread* instance_;
 };

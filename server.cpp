@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -7,12 +8,32 @@
 #include <signal.h>
 #include "server.hpp"
 
+SocketThread* SocketThread::instance_ = NULL;
+
+SocketThread* SocketThread::Instance() {
+  if (!instance_) {
+    instance_ = new SocketThread;
+  }
+  return instance_;
+}
+
 SocketThread::SocketThread()
   : pid_(0),
+    socket_path_(".socket"),
     sockfd_(0),
     curr_sock_fd_(0) {
-  printf("Init mutex...\n");
+  fprintf(stdout, "Init mutex...\n");
   pthread_mutex_init(&mutex_, NULL);
+  struct sigaction act;
+  memset(&act, '\0', sizeof(act));
+  act.sa_sigaction = &thread_stopper;
+  act.sa_flags = SA_SIGINFO;
+  if (sigaction(SIGTERM, &act, NULL) < 0) {
+    fprintf(stderr, "Failed to register SIGTERM\n");
+  }
+  if (sigaction(SIGINT, &act, NULL) < 0) {
+    fprintf(stderr, "Failed to register SIGTINT\n");
+  }
 }
 
 SocketThread::~SocketThread() {
@@ -20,17 +41,17 @@ SocketThread::~SocketThread() {
 }
 
 bool SocketThread::start() {
-  printf("Creating thread...\n");
-  if (pthread_create(&pid_, NULL, &(SocketThread::thread_helper), this) != 0) {
+  fprintf(stdout, "Creating thread...\n");
+  if (pthread_create(&pid_, NULL, &(SocketThread::thread_starter), this) != 0) {
     fprintf(stderr, "Error: Failed to start thread\n");
     return false;
   }
-  printf("Thread created\n");
+  fprintf(stdout, "Thread created\n");
   return true;
 }
 
 void SocketThread::stop() {
-  printf("Destroying mutex...\n");
+  fprintf(stdout, "Destroying mutex...\n");
   pthread_mutex_destroy(&mutex_);
   if (pid_) {
     pthread_cancel(pid_);
@@ -40,39 +61,50 @@ void SocketThread::stop() {
     close(sockfd_);
     sockfd_ = 0;
   }
+
+  if (access(socket_path_.c_str(), F_OK) != -1) {
+    fprintf(stdout, "Cleanup socket\n");
+    unlink(socket_path_.c_str());
+  }
 }
 
-void *SocketThread::thread_helper(void *obj) {
-  printf("Starting thread helper...\n");
-  return reinterpret_cast<SocketThread *>(obj)->thread_server();
+void *SocketThread::thread_starter(void *obj) {
+  fprintf(stdout, "Starting thread starter...\n");
+  return reinterpret_cast<SocketThread *>(obj)->run_server();
 }
 
-void *SocketThread::thread_server() {
-  printf("Starting thread server...\n");
+void SocketThread::thread_stopper(int sig, siginfo_t *siginfo, void *context) {
+  fprintf(stdout, "Starting thread stopper...\n");
+  Instance()->stop();
+  exit(0);
+}
+
+void *SocketThread::run_server() {
+  fprintf(stdout, "Starting thread server...\n");
   if (pthread_mutex_trylock(&mutex_) != 0) {
     fprintf(stderr, "Error: Failed to lock mutex thread\n");
     return NULL;
   }
 
-  printf("Creating socket...\n");
+  fprintf(stdout, "Creating socket...\n");
   if ((sockfd_ = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
     fprintf(stderr, "Error: Failed to create socket\n");
     return NULL;
   }
 
-  printf("Initializing socket...\n");
+  fprintf(stdout, "Initializing socket...\n");
   struct sockaddr_un serv_addr;
   bzero(&serv_addr, sizeof(serv_addr));
   serv_addr.sun_family = AF_UNIX;
-  strcpy(serv_addr.sun_path, ".socket");
+  strcpy(serv_addr.sun_path, socket_path_.c_str());
 
-  printf("Binding socket...\n");
+  fprintf(stdout, "Binding socket...\n");
   if (bind(sockfd_, (struct sockaddr*) &serv_addr, sizeof(serv_addr)) == -1) {
     fprintf(stderr, "Error: Failed to bind socket\n");
     return NULL;
   }
 
-  printf("Listening socket...\n");
+  fprintf(stdout, "Listening socket...\n");
   if (listen(sockfd_, MAX_BACKLOG) == -1) {
     fprintf(stderr, "Error: Failed to listen to socket\n");
     return NULL;
@@ -96,17 +128,12 @@ void *SocketThread::thread_server() {
   }
 }
 
-void terminate(SocketThread &) {
-
-}
-
 int main() {
-  SocketThread socket;
-  socket.start();
+  SocketThread::Instance()->start();
   char buffer[SocketThread::BUFFER_SIZE];
-  printf("Fake loop...");
+  fprintf(stdout, "Fake loop...");
   while (true) {
     scanf("%s", buffer);
   }
-  socket.stop();
+  SocketThread::Instance()->stop();
 }
